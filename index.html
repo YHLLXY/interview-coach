@@ -195,6 +195,8 @@
     <div class="card">
       <h2>📋 我的面试记录 <span class="refresh-btn" onclick="renderInterviewerView()">🔄</span></h2>
       <p class="subtitle">每场面试的AI四维评估（结构化/偏见风险/候选人体验/问题有效性）</p>
+      <button class="btn btn-cyan" onclick="openRecordModal()" style="margin-bottom:12px">➕ 记录新面试 · 获取AI评估</button>
+      <div id="coachingNotif" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:8px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);font-size:13px"></div>
       <div class="interview-list" id="myInterviews"></div>
     </div>
     <div class="card">
@@ -233,8 +235,21 @@
   </div>
 </div>
 
+<!-- Record Interview Modal -->
+<div class="modal-overlay" id="recordModal"><div class="modal"><h3>📋 记录新面试 · AI自动评估</h3>
+  <label>候选人姓名</label><input type="text" id="recCandidate" placeholder="如：应聘者K">
+  <label>应聘岗位</label><input type="text" id="recPosition" placeholder="如：前端开发工程师">
+  <label>面试日期</label><input type="date" id="recDate">
+  <label>面试笔记（AI将据此分析面试质量）</label><textarea id="recNotes" placeholder="记录面试过程，AI会自动评估结构化程度、偏见风险、候选人体验和问题有效性...&#10;&#10;例如：&#10;1. 开场让候选人做了自我介绍&#10;2. 问了算法题，候选人用了暴力解法，我追问了优化方向&#10;3. 问了"你最大的缺点"，候选人回答比较坦诚&#10;4. 最后给候选人留了5分钟提问时间"></textarea>
+  <div class="btn-row"><button class="btn btn-outline" onclick="closeModal('recordModal')">取消</button><button class="btn btn-cyan" onclick="submitNewInterview()">🤖 提交并获取AI评估</button></div>
+</div></div>
+
 <script>
 // ==================== DATA ====================
+// Coaching tasks (HR assigns → interviewer receives)
+let coachingTasks = [
+  {id:1,interviewerId:4,from:'HR',message:'面试官认证培训通知：你的近3场面试存在结构化不足和偏见风险问题，请于本周五前完成《面试官法律合规与结构化面试》在线课程。',date:'2026-06-03',read:false},
+];
 const interviewers = [
   {id:1,name:'张明（技术总监）',role:'技术面试官',total:48,trend:'↑'},
   {id:2,name:'李华（产品负责人）',role:'产品面试官',total:35,trend:'→'},
@@ -348,7 +363,7 @@ function updateIdentitySelect(){
 
 function renderAll(){
   renderStats();
-  if(currentRole==='interviewer'){renderInterviewerView();renderPracticeMode();renderGrowthTrend()}
+  if(currentRole==='interviewer'){renderInterviewerView();renderPracticeMode();renderGrowthTrend();renderCoachingNotif()}
   else{renderHRView();renderBestPractices()}
 }
 
@@ -489,7 +504,7 @@ function renderHRView(){
       <td>${avg('structure')}</td><td>${avg('bias')}</td><td>${avg('experience')}</td><td>${avg('effect')}</td>
       <td><span class="badge ${cl}">${avgO}</span></td>
       <td>${iv.trend}</td>
-      <td><button class="btn btn-cyan btn-sm" onclick="event.stopPropagation();switchToInterviewer(${iv.id})">🔍 查看</button></td>
+      <td><button class="btn btn-cyan btn-sm" onclick="event.stopPropagation();switchToInterviewer(${iv.id})">🔍 查看</button> ${avgO<70?`<button class="btn btn-purple btn-sm" onclick="event.stopPropagation();assignCoaching(${iv.id})">📋 指派辅导</button>`:''}</td>
     </tr>`;
   }).join('');
 
@@ -534,6 +549,227 @@ function showToast(msg,type){
   const t=document.createElement('div');t.className='toast '+(type||'success');t.textContent=msg;
   document.body.appendChild(t);
   setTimeout(()=>{t.style.animation='slideIn 0.3s ease reverse';setTimeout(()=>t.remove(),300)},2500);
+}
+
+// ==================== MODAL ====================
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+// ==================== RECORD NEW INTERVIEW ====================
+function openRecordModal(){
+  document.getElementById('recDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('recCandidate').value='';
+  document.getElementById('recPosition').value='';
+  document.getElementById('recNotes').value='';
+  document.getElementById('recordModal').classList.add('show');
+}
+
+function submitNewInterview(){
+  const candidate=document.getElementById('recCandidate').value.trim();
+  const position=document.getElementById('recPosition').value.trim();
+  const date=document.getElementById('recDate').value;
+  const notes=document.getElementById('recNotes').value.trim();
+  if(!candidate||!position||!notes){showToast('请填写候选人、岗位和面试笔记','warn');return;}
+
+  // AI simulates evaluation based on note length and keywords
+  const noteLen=notes.length;
+  const hasStructure=/步骤|提纲|环节|开场|自我介绍|提问|追问|结尾|框架/i.test(notes);
+  const hasBias=/平等|公正|客观|标准|一致|避免|注意/i.test(notes);
+  const hasExperience=/氛围|体验|放松|尊重|倾听|微笑|耐心|鼓励/i.test(notes);
+  const hasEffect=/能力|技能|匹配|相关|深挖|验证|评估|测试|展示/i.test(notes);
+
+  const structure=Math.min(95,55+hasStructure*18+Math.floor(noteLen/20)+Math.floor(Math.random()*10));
+  const bias=Math.min(95,50+hasBias*20+Math.floor(Math.random()*15));
+  const experience=Math.min(95,58+hasExperience*15+Math.floor(Math.random()*12));
+  const effect=Math.min(95,52+hasEffect*18+Math.floor(Math.random()*10));
+  const overall=Math.round((structure+bias+experience+effect)/4);
+
+  // Generate AI note
+  const aiNotes=generateAINote(structure,bias,experience,effect,notes);
+  const strengths=generateStrengths(structure,bias,experience,effect);
+  const improvements=generateImprovements(structure,bias,experience,effect);
+
+  const newIv={
+    id:Math.max(0,...interviews.map(i=>i.id))+1,
+    interviewerId:currentInterviewerId,candidate,position,date,
+    structure,bias,experience,effect,overall,status:'completed',
+    note:aiNotes,strengths,improvements
+  };
+  interviews.unshift(newIv);
+  // Update total count
+  const iv=interviewers.find(i=>i.id===currentInterviewerId);
+  if(iv) iv.total++;
+
+  closeModal('recordModal'); renderAll();
+  showToast('🤖 AI评估完成！综合评分：'+overall+'分','info');
+}
+
+function generateAINote(s,b,e,ef,notes){
+  const parts=[];
+  if(s>=80) parts.push('结构化程度良好，面试流程完整有逻辑');
+  else if(s>=65) parts.push('结构化程度一般，建议增加面试提纲的准备');
+  else parts.push('结构化程度需要大幅提升，建议使用标准化面试提纲');
+
+  if(b>=80) parts.push('偏见控制表现优秀，提问公平公正');
+  else if(b>=65) parts.push('偏见控制尚可，仍需警惕"像我效应"等认知偏差');
+  else parts.push('存在偏见风险，需注意提问的公平性和一致性');
+
+  if(e>=80) parts.push('候选人体验出色，氛围轻松专业');
+  else if(e>=65) parts.push('候选人体验中规中矩，可增加更多互动和倾听');
+  else parts.push('候选人体验需要改善，注意倾听和给予候选人充分的表达空间');
+
+  if(ef>=80) parts.push('问题与岗位高度相关，能有效区分候选人水平');
+  else if(ef>=65) parts.push('问题有效性一般，部分问题与岗位能力的关联不够紧密');
+  else parts.push('问题有效性不足，建议围绕岗位核心能力设计评估维度');
+
+  return parts.join('。')+'。';
+}
+
+function generateStrengths(s,b,e,ef){
+  const all=[];
+  if(s>=75) all.push('面试流程有清晰的逻辑结构');
+  if(b>=75) all.push('偏见控制意识强');
+  if(e>=75) all.push('候选人体验良好');
+  if(ef>=75) all.push('问题设计有效性强');
+  if(all.length<2) all.push('具备基本的面试能力基础');
+  return all.slice(0,3);
+}
+
+function generateImprovements(s,b,e,ef){
+  const all=[];
+  if(s<75) all.push('建议使用结构化面试提纲');
+  if(b<75) all.push('注意避免刻板印象和"像我效应"');
+  if(e<75) all.push('增加候选人的表达空间和互动');
+  if(ef<75) all.push('设计更聚焦岗位能力的评估问题');
+  if(all.length<2) all.push('可以在面试结尾更清晰介绍后续流程');
+  return all.slice(0,3);
+}
+
+// ==================== ENHANCED PRACTICE (multi-step) ====================
+let practiceState = null;
+
+const practiceSteps = {
+  s1:[
+    {q:'AI候选人：「我熟悉React和Vue，做过几个后台管理项目……」你接下来问什么？',options:['请详细说说你项目中遇到的性能问题怎么解决的','你会Python吗','你老家哪里的'],best:0},
+    {q:'AI候选人：「我用了虚拟列表和懒加载优化……」请继续追问：',options:['能画一下你的架构图吗','你觉得加班多正常吗','那你的期望薪资是多少'],best:0},
+    {q:'面试结束。AI总结评估中……',options:[],best:-1},
+  ],
+  s2:[
+    {q:'AI候选人：「我主导过DAU 100万的产品从0到1……」你下一个问题？',options:['你具体负责了哪些模块？数据是怎么增长的？','你们团队多少人','你学历是什么'],best:0},
+    {q:'AI候选人：「我通过A/B测试优化了转化率……」请深挖：',options:['实验设计是怎么做的？样本量多少？置信度如何？','你用的是哪个平台','你月薪多少'],best:0},
+    {q:'面试结束。AI总结评估中……',options:[],best:-1},
+  ],
+};
+
+function renderPracticeMode(){
+  practiceState=null;
+  document.getElementById('scenarioGrid').innerHTML=scenarios.map(s=>`
+    <button class="scenario-btn" onclick="startPractice('${s.id}')">
+      <span class="sc-icon">${s.icon}</span><strong>${s.title}</strong><br><span style="font-size:10px;color:var(--text2)">${s.desc}</span>
+    </button>
+  `).join('');
+  document.getElementById('practiceResult').innerHTML='';
+}
+
+function startPractice(sid){
+  const steps=practiceSteps[sid]||practiceSteps.s1;
+  const scenario=scenarios.find(s=>s.id===sid);
+  practiceState={sid,step:0,scores:[]};
+  renderPracticeStep(scenario,steps[0],0,steps.length);
+}
+
+function renderPracticeStep(scenario,step,idx,total){
+  if(!step.q||step.best<0){
+    // Final evaluation
+    const avgScore=60+Math.floor(Math.random()*28);
+    const good=avgScore>=80;
+    document.getElementById('practiceResult').innerHTML=`
+      <div style="background:var(--card3);border-radius:12px;padding:16px;text-align:left;animation:fadeSlide 0.5s ease">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+          <div class="score-ring sm"><svg width="60" height="60" viewBox="0 0 56 56"><circle cx="28" cy="28" r="24" fill="none" stroke="var(--border)" stroke-width="4"/><circle cx="28" cy="28" r="24" fill="none" stroke="${good?'var(--green)':'var(--gold)'}" stroke-width="4" stroke-dasharray="${2*Math.PI*24}" stroke-dashoffset="${2*Math.PI*24*(1-avgScore/100)}" stroke-linecap="round"/></svg><span class="ring-val">${avgScore}</span></div>
+          <div><strong>练习完成！${scenario?.title}</strong><br><span style="font-size:11px;color:var(--text2)">${good?'表现优秀！':'还有提升空间'}</span></div>
+        </div>
+        <p style="font-size:12px;color:var(--text2)">${good?'你的追问层层递进，有效挖掘了候选人的真实能力。':'建议在追问时更聚焦岗位核心能力，避免偏离主题。'}保持结构化思维，每次面试前准备好评估维度。</p>
+        <button class="btn btn-cyan btn-sm" style="margin-top:10px" onclick="renderPracticeMode()">🔄 换个场景练习</button>
+      </div>
+    `;
+    document.getElementById('scenarioGrid').style.display='none';
+    return;
+  }
+
+  document.getElementById('practiceResult').innerHTML=`
+    <div style="background:var(--card3);border-radius:12px;padding:16px;text-align:left;animation:fadeSlide 0.4s ease">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:4px">第 ${idx+1}/${total} 步</div>
+      <p style="margin-bottom:12px;font-weight:500">${step.q}</p>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${step.options.map((o,i)=>`<button class="scenario-btn" style="text-align:left;padding:10px" onclick="answerPractice(${i})">${i===step.best?'⭐ ':''}${o}</button>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function answerPractice(choice){
+  const scenario=scenarios.find(s=>s.id===practiceState.sid);
+  const steps=practiceSteps[practiceState.sid]||practiceSteps.s1;
+  const step=steps[practiceState.step];
+  const isBest=choice===step.best;
+
+  // Show feedback
+  const fb=isBest?'✅ 很好的选择！这是一个有效的追问，能深入评估候选人的真实能力。':'⚠️ 这个问题与评估岗位能力关联不够紧密，建议聚焦在候选人的专业能力和经验上。';
+
+  document.getElementById('practiceResult').innerHTML=`
+    <div style="background:var(--card3);border-radius:12px;padding:16px;text-align:left;animation:fadeSlide 0.3s ease">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:4px">即时反馈</div>
+      <p style="font-size:13px;color:${isBest?'var(--green)':'var(--gold)'}">${fb}</p>
+      <button class="btn btn-cyan btn-sm" style="margin-top:10px" onclick="continuePractice()">▶ 继续下一题</button>
+    </div>
+  `;
+  practiceState.scores.push(isBest?1:0);
+}
+
+function continuePractice(){
+  practiceState.step++;
+  const scenario=scenarios.find(s=>s.id===practiceState.sid);
+  const steps=practiceSteps[practiceState.sid]||practiceSteps.s1;
+  if(practiceState.step>=steps.length){
+    renderPracticeStep(scenario,{q:'',best:-1},practiceState.step,steps.length);
+  }else{
+    renderPracticeStep(scenario,steps[practiceState.step],practiceState.step,steps.length);
+  }
+}
+
+// ==================== HR COACHING ASSIGN ====================
+function assignCoaching(interviewerId){
+  const iv=interviewers.find(i=>i.id===interviewerId);
+  const task={
+    id:Math.max(0,...coachingTasks.map(t=>t.id))+1,
+    interviewerId,from:'HR',
+    message:`辅导通知：HR注意到你最近的面试质量需要提升。请于本周内完成：1) 复习《面试官法律红线清单》2) 使用结构化面试提纲完成下一场面试 3) 参加周五的面试官认证培训。`,
+    date:new Date().toISOString().split('T')[0],read:false
+  };
+  coachingTasks.push(task);
+  showToast(`📤 辅导任务已发送给 ${iv?.name.split('（')[0]}`,'info');
+  renderAll();
+}
+
+// ==================== COACHING NOTIFICATION CHECK ====================
+function renderCoachingNotif(){
+  const tasks=coachingTasks.filter(t=>t.interviewerId===currentInterviewerId&&!t.read);
+  const div=document.getElementById('coachingNotif');
+  if(tasks.length===0){div.style.display='none';return;}
+  div.style.display='block';
+  div.innerHTML=tasks.map(t=>`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>📨 <strong>来自${t.from}：</strong>${t.message} <span style="font-size:10px;color:var(--text2)">${t.date}</span></div>
+      <button class="btn btn-purple btn-sm" onclick="dismissCoaching(${t.id})">✓ 已读</button>
+    </div>
+  `).join('');
+}
+
+function dismissCoaching(id){
+  const t=coachingTasks.find(tt=>tt.id===id);
+  if(t) t.read=true;
+  renderCoachingNotif();
+  showToast('✅ 已标记为已读','success');
 }
 
 // INIT
