@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI面试官训练营 · 面试质量评估与提升平台</title>
+<style>
+  :root{
+    --bg:#0a0e17;--card:#111827;--card2:#1a2235;--card3:#1e293b;
+    --text:#e2e8f0;--text2:#94a3b8;--border:#1e293b;
+    --cyan:#06b6d4;--purple:#a855f7;--gold:#f59e0b;--green:#10b981;--red:#ef4444;--blue:#3b82f6;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh;
+    background-image:radial-gradient(ellipse at 30% 0%,rgba(6,182,212,0.06) 0%,transparent 50%),radial-gradient(ellipse at 70% 80%,rgba(168,85,247,0.05) 0%,transparent 50%);
+  }
+
+  /* Animated grid + orbs */
+  .bg-grid{position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.03;
+    background-image:linear-gradient(rgba(6,182,212,0.5) 1px,transparent 1px),linear-gradient(90deg,rgba(6,182,212,0.5) 1px,transparent 1px);
+    background-size:40px 40px;animation:gridShift 15s linear infinite}
+  @keyframes gridShift{0%{background-position:0 0}100%{background-position:40px 40px}}
+  .orb{position:fixed;border-radius:50%;filter:blur(90px);pointer-events:none;z-index:0;opacity:0.1}
+  .orb-a{width:300px;height:300px;background:var(--cyan);top:5%;left:-5%;animation:floatA 8s ease-in-out infinite}
+  .orb-b{width:250px;height:250px;background:var(--purple);bottom:10%;right:-3%;animation:floatB 10s ease-in-out infinite}
+  @keyframes floatA{0%,100%{transform:translate(0,0)}50%{transform:translate(50px,-30px)}}
+  @keyframes floatB{0%,100%{transform:translate(0,0)}50%{transform:translate(-40px,20px)}}
+
+  .header{
+    background:linear-gradient(180deg,rgba(17,24,39,0.97),rgba(17,24,39,0.85));border-bottom:1px solid var(--border);
+    padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+    position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);
+  }
+  .header .brand{display:flex;align-items:center;gap:8px}
+  .header .logo{font-size:28px;animation:logoPulse 2s ease-in-out infinite}
+  @keyframes logoPulse{0%,100%{filter:drop-shadow(0 0 3px var(--cyan))}50%{filter:drop-shadow(0 0 16px var(--cyan))}}
+  .header h1{font-size:20px;font-weight:700;background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+
+  .container{max-width:1300px;margin:0 auto;padding:16px 20px 60px;position:relative;z-index:1}
+
+  /* Top bar */
+  .top-bar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+  .role-tabs{display:flex;gap:3px;background:var(--card);border-radius:12px;padding:3px;border:1px solid var(--border)}
+  .role-tab{padding:10px 20px;border:none;background:transparent;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text2);transition:all 0.3s}
+  .role-tab:hover{background:var(--card2)}
+  .role-tab.active{background:linear-gradient(135deg,rgba(6,182,212,0.2),rgba(168,85,247,0.2));color:var(--cyan)}
+  .identity-select{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px 14px;color:var(--text);font-size:13px;cursor:pointer;outline:none;font-family:inherit}
+  .identity-select:focus{border-color:var(--cyan)}
+
+  /* Stats */
+  .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  @media(max-width:900px){.stats-row{grid-template-columns:repeat(2,1fr)}}
+  .stat-card{
+    background:var(--card);border-radius:12px;padding:18px;border:1px solid var(--border);
+    transition:all 0.4s;cursor:default;border-top:2px solid transparent;position:relative;overflow:hidden;
+  }
+  .stat-card:hover{transform:translateY(-3px)}
+  .stat-card.c1{border-top-color:var(--cyan)}.stat-card.c1:hover{box-shadow:0 0 20px rgba(6,182,212,0.12)}
+  .stat-card.c2{border-top-color:var(--purple)}.stat-card.c2:hover{box-shadow:0 0 20px rgba(168,85,247,0.12)}
+  .stat-card.c3{border-top-color:var(--gold)}.stat-card.c3:hover{box-shadow:0 0 20px rgba(245,158,11,0.12)}
+  .stat-card.c4{border-top-color:var(--green)}.stat-card.c4:hover{box-shadow:0 0 20px rgba(16,185,129,0.12)}
+  .stat-card .stat-icon{font-size:26px;margin-bottom:6px}
+  .stat-card .stat-value{font-size:28px;font-weight:800}
+  .stat-card .stat-label{font-size:11px;color:var(--text2);margin-top:2px}
+  .stat-card .stat-sub{font-size:10px;margin-top:4px}
+  .stat-glow{position:absolute;top:-20px;right:-20px;width:60px;height:60px;border-radius:50%;filter:blur(30px);opacity:0.15;transition:opacity 0.4s}
+  .stat-card:hover .stat-glow{opacity:0.3}
+
+  /* Card */
+  .card{background:var(--card);border-radius:14px;padding:22px;margin-bottom:16px;border:1px solid var(--border);transition:all 0.3s}
+  .card:hover{border-color:rgba(6,182,212,0.25)}
+  .card h2{font-size:17px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .card .subtitle{font-size:12px;color:var(--text2);margin-bottom:16px}
+  .card .refresh-btn{margin-left:auto;font-size:18px;cursor:pointer;transition:transform 0.6s;display:inline-block}
+  .card .refresh-btn:hover{transform:rotate(180deg)}
+
+  /* Score ring */
+  .score-ring{display:inline-flex;align-items:center;justify-content:center;position:relative}
+  .score-ring svg{transform:rotate(-90deg)}
+  .score-ring .ring-val{position:absolute;font-size:22px;font-weight:800}
+  .score-ring.sm svg{width:60px;height:60px}
+  .score-ring.sm .ring-val{font-size:16px}
+
+  /* Interview cards */
+  .interview-list{display:flex;flex-direction:column;gap:10px}
+  .interview-item{
+    background:var(--card2);border-radius:12px;padding:16px;border:1px solid var(--border);
+    transition:all 0.3s;cursor:pointer;display:flex;gap:16px;align-items:flex-start;
+  }
+  .interview-item:hover{border-color:var(--cyan);transform:translateX(3px)}
+  .interview-item .iv-score{flex-shrink:0}
+  .interview-item .iv-info{flex:1;min-width:0}
+  .interview-item .iv-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px}
+  .interview-item .iv-title{font-weight:700;font-size:14px}
+  .interview-item .iv-meta{font-size:11px;color:var(--text2);display:flex;gap:16px;flex-wrap:wrap}
+  .interview-item .iv-dimensions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .dimension-bar{display:flex;align-items:center;gap:6px;font-size:11px}
+  .dimension-bar .dim-label{color:var(--text2);white-space:nowrap}
+  .dimension-bar .dim-track{width:80px;height:5px;border-radius:3px;background:var(--border);overflow:hidden}
+  .dimension-bar .dim-fill{height:100%;border-radius:3px;transition:width 0.8s ease}
+  .dim-fill.good{background:var(--green)}.dim-fill.ok{background:var(--gold)}.dim-fill.bad{background:var(--red)}
+
+  /* AI feedback box */
+  .ai-feedback{
+    margin-top:10px;padding:12px;border-radius:10px;
+    background:linear-gradient(135deg,rgba(6,182,212,0.06),rgba(168,85,247,0.06));
+    border:1px solid rgba(6,182,212,0.15);font-size:12px;position:relative;overflow:hidden;
+  }
+  .ai-feedback::before{content:'';position:absolute;top:0;left:0;width:100%;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);animation:scanLine 3s linear infinite}
+  @keyframes scanLine{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+  .ai-feedback .fb-item{margin:4px 0;padding-left:8px;border-left:2px solid var(--cyan)}
+
+  /* Practice mode */
+  .practice-card{background:var(--card2);border-radius:12px;padding:20px;border:2px dashed var(--border);text-align:center;transition:all 0.3s}
+  .practice-card:hover{border-color:var(--purple)}
+  .practice-card .scenario-select{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:12px 0}
+  .scenario-btn{
+    padding:12px;border-radius:10px;background:var(--card3);border:1px solid var(--border);
+    cursor:pointer;transition:all 0.3s;text-align:left;font-size:12px;color:var(--text);font-family:inherit;
+  }
+  .scenario-btn:hover{border-color:var(--cyan);transform:translateY(-2px)}
+  .scenario-btn .sc-icon{font-size:20px;margin-bottom:4px;display:block}
+
+  /* Table */
+  .quality-table{width:100%;border-collapse:collapse;font-size:13px}
+  .quality-table th{text-align:left;padding:10px 12px;color:var(--text2);font-weight:500;border-bottom:1px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:1px}
+  .quality-table td{padding:10px 12px;border-bottom:1px solid rgba(30,41,59,0.5)}
+  .quality-table tbody tr{transition:all 0.2s;cursor:pointer}
+  .quality-table tbody tr:hover{background:rgba(6,182,212,0.03)}
+
+  /* Badge */
+  .badge{display:inline-block;padding:3px 10px;border-radius:10px;font-size:10px;font-weight:700}
+  .badge-good{background:rgba(16,185,129,0.15);color:var(--green)}
+  .badge-ok{background:rgba(245,158,11,0.15);color:var(--gold)}
+  .badge-bad{background:rgba(239,68,68,0.15);color:var(--red)}
+
+  /* Modal */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:200;align-items:center;justify-content:center}
+  .modal-overlay.show{display:flex}
+  .modal{background:var(--card);border-radius:16px;padding:28px;max-width:600px;width:92%;border:1px solid var(--border);animation:modalIn 0.3s ease;max-height:85vh;overflow-y:auto}
+  @keyframes modalIn{from{opacity:0;transform:scale(0.95) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+  .modal h3{font-size:18px;margin-bottom:16px}
+  .modal label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin:10px 0 4px}
+  .modal input,.modal select,.modal textarea{
+    width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border);
+    background:var(--card2);color:var(--text);font-size:13px;font-family:inherit;outline:none;
+  }
+  .modal textarea{resize:vertical;min-height:80px}
+  .modal .btn-row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+
+  /* Buttons */
+  .btn{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.3s;border:none;display:inline-flex;align-items:center;gap:4px}
+  .btn-cyan{background:var(--cyan);color:#000}.btn-cyan:hover{box-shadow:0 0 16px rgba(6,182,212,0.4);transform:translateY(-1px)}
+  .btn-purple{background:var(--purple);color:#fff}.btn-purple:hover{box-shadow:0 0 16px rgba(168,85,247,0.4)}
+  .btn-gold{background:var(--gold);color:#000}
+  .btn-green{background:var(--green);color:#fff}
+  .btn-outline{background:transparent;color:var(--cyan);border:1px solid var(--cyan)}
+  .btn-sm{padding:4px 10px;font-size:10px;border-radius:5px}
+
+  .tab-content{display:none}
+  .tab-content.show{display:block;animation:fadeSlide 0.35s ease}
+  @keyframes fadeSlide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+  .toast{position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;color:#fff;font-weight:500;z-index:300;animation:slideIn 0.35s ease;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,0.3)}
+  @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+  .toast.success{background:var(--green)}.toast.info{background:var(--cyan);color:#000}.toast.warn{background:var(--gold);color:#000}
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div><div class="orb orb-a"></div><div class="orb orb-b"></div>
+
+<div class="header">
+  <div class="brand"><span class="logo">🎙️</span><h1>AI面试官训练营 · 面试质量评估与提升</h1></div>
+  <span style="font-size:11px;color:var(--text2)">📅 <span id="clock"></span></span>
+</div>
+
+<div class="container">
+
+  <div class="top-bar">
+    <div class="role-tabs">
+      <button class="role-tab active" onclick="switchRole('interviewer')">🎙️ 面试官视角</button>
+      <button class="role-tab" onclick="switchRole('hr')">📊 HR 管理视角</button>
+    </div>
+    <select class="identity-select" id="identitySelect" onchange="switchIdentity(this.value)"></select>
+    <span style="font-size:11px;color:var(--text2)" id="identityHint"></span>
+  </div>
+
+  <div class="stats-row" id="statsRow"></div>
+
+  <!-- ===== INTERVIEWER VIEW ===== -->
+  <div class="tab-content show" id="view-interviewer">
+    <div class="card">
+      <h2>📋 我的面试记录 <span class="refresh-btn" onclick="renderInterviewerView()">🔄</span></h2>
+      <p class="subtitle">每场面试的AI四维评估（结构化/偏见风险/候选人体验/问题有效性）</p>
+      <div class="interview-list" id="myInterviews"></div>
+    </div>
+    <div class="card">
+      <h2>🎯 AI模拟面试练习 <span class="refresh-btn" onclick="renderPracticeMode()">🔄</span></h2>
+      <p class="subtitle">选择一个场景，AI扮演候选人，练习你的面试技巧并获得即时反馈</p>
+      <div class="practice-card" id="practicePanel">
+        <p style="color:var(--text2);margin-bottom:8px">选择练习场景：</p>
+        <div class="scenario-select" id="scenarioGrid"></div>
+        <div id="practiceResult" style="margin-top:12px"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>📈 我的成长趋势</h2>
+      <div id="growthTrend"></div>
+    </div>
+  </div>
+
+  <!-- ===== HR VIEW ===== -->
+  <div class="tab-content" id="view-hr">
+    <div class="card">
+      <h2>📊 团队面试质量看板 <span class="refresh-btn" onclick="renderHRView()">🔄</span></h2>
+      <p class="subtitle">8位面试官的表现对比 · 点击面试官查看详情</p>
+      <table class="quality-table">
+        <thead><tr><th>面试官</th><th>累计面试</th><th>结构化</th><th>偏见控制</th><th>候选人体验</th><th>问题有效性</th><th>综合评分</th><th>趋势</th><th>操作</th></tr></thead>
+        <tbody id="qualityTable"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2>🚨 AI 质量预警</h2>
+      <div id="hrAlerts"></div>
+    </div>
+    <div class="card">
+      <h2>📚 最佳实践库 <span class="refresh-btn" onclick="renderBestPractices()">🔄</span></h2>
+      <div id="bestPractices"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== DATA ====================
+const interviewers = [
+  {id:1,name:'张明（技术总监）',role:'技术面试官',total:48,trend:'↑'},
+  {id:2,name:'李华（产品负责人）',role:'产品面试官',total:35,trend:'→'},
+  {id:3,name:'王芳（HR经理）',role:'综合面试官',total:62,trend:'↑'},
+  {id:4,name:'陈鹏（高级工程师）',role:'技术面试官',total:22,trend:'↓'},
+  {id:5,name:'刘悦（设计主管）',role:'设计面试官',total:18,trend:'→'},
+  {id:6,name:'赵磊（销售总监）',role:'业务面试官',total:30,trend:'↑'},
+  {id:7,name:'孙婷（HRBP）',role:'综合面试官',total:41,trend:'↓'},
+  {id:8,name:'周杰（技术专家）',role:'技术面试官',total:15,trend:'→'},
+];
+
+// Interview records with AI scores
+let interviews = [
+  {id:1,interviewerId:1,candidate:'应聘者A',position:'前端开发',date:'2026-06-03',structure:85,bias:72,experience:90,effect:80,overall:82,status:'completed',
+    note:'面试过程整体流畅，技术问题覆盖全面。但在追问环节有2次打断候选人，需要注意倾听。结构化问题占比70%，可以进一步提升。',
+    strengths:['技术问题覆盖面广','能深入挖掘项目经验','时间控制合理'],
+    improvements:['减少打断候选人的频率','增加行为面试法的使用','结尾给候选人留更多提问时间']},
+  {id:2,interviewerId:1,candidate:'应聘者B',position:'后端开发',date:'2026-05-28',structure:78,bias:65,experience:82,effect:75,overall:75,status:'completed',
+    note:'整体表现中规中矩。在"你最大的缺点是什么"问题上追问方式可能给候选人带来压力。建议使用更温和的表达方式。',
+    strengths:['面试流程完整','对技术深度有较好判断'],
+    improvements:['注意压力问题的表达方式','增强候选人体验意识','准备更多开放性问题']},
+  {id:3,interviewerId:1,candidate:'应聘者C',position:'全栈开发',date:'2026-05-20',structure:92,bias:85,experience:88,effect:90,overall:89,status:'completed',
+    note:'这是一场高质量的面试！结构化程度高，几乎无偏见风险，候选人反馈积极。可以录为团队最佳实践案例。',
+    strengths:['结构化问题比例优秀','候选人参与感强','问题之间逻辑衔接自然'],
+    improvements:['可以在结尾更明确地介绍下一步流程','偶尔可以多一些即兴追问']},
+  {id:4,interviewerId:2,candidate:'应聘者D',position:'产品经理',date:'2026-06-02',structure:65,bias:58,experience:70,effect:62,overall:64,status:'completed',
+    note:'结构化程度偏低，面试过程较多自由发散。建议准备结构化面试提纲。另外，对"是否打算结婚"等与工作无关的问题需要特别注意，存在法律风险。',
+    strengths:['建立了良好的沟通氛围'],
+    improvements:['必须停止询问与工作无关的个人问题','准备结构化面试提纲','提升问题有效性']},
+  {id:5,interviewerId:2,candidate:'应聘者E',position:'产品经理',date:'2026-05-25',structure:72,bias:70,experience:78,effect:75,overall:74,status:'completed',
+    note:'较上一次有进步，开始使用结构化提纲。但在评估候选人时仍有"像我效应"——对背景相似的候选人评分偏高。',
+    strengths:['使用了结构化提纲','给候选人充足的展示时间'],
+    improvements:['警惕"像我效应"偏见','多维度评估候选人','参考结构化评分表']},
+  {id:6,interviewerId:3,candidate:'应聘者F',position:'HR专员',date:'2026-06-01',structure:90,bias:92,experience:95,effect:88,overall:91,status:'completed',
+    note:'非常专业的面试！结构化程度高，偏见控制出色，候选人反馈非常好。建议作为团队面试培训的示范案例。',
+    strengths:['面试开场专业且温暖','结构化问题与行为面试法结合良好','候选人体验出色','法律合规性完美'],
+    improvements:['可以稍微缩短面试时间（当前65分钟偏长）']},
+  {id:7,interviewerId:4,candidate:'应聘者G',position:'Java开发',date:'2026-06-03',structure:55,bias:45,experience:60,effect:50,overall:52,status:'completed',
+    note:'面试结构化严重不足，几乎全程自由对话。出现了与年龄相关的暗示性提问，存在重大法律风险。强烈建议立即接受面试培训。',
+    strengths:['技术功底扎实，判断准确'],
+    improvements:['紧急：停止年龄/婚育等敏感话题','必须使用结构化面试提纲','提升候选人体验意识','建议参加面试官认证培训']},
+  {id:8,interviewerId:5,candidate:'应聘者H',position:'UI设计师',date:'2026-05-30',structure:80,bias:78,experience:85,effect:82,overall:81,status:'completed',
+    note:'作品集评审环节做得很好，问题与设计能力高度相关。可以增加更多行为面试问题来评估协作能力。',
+    strengths:['作品集评审结构化','问题与岗位高度相关','善于营造轻松氛围'],
+    improvements:['增加行为面试问题','评估跨团队协作能力','统一评分标准']},
+  {id:9,interviewerId:6,candidate:'应聘者I',position:'大客户销售',date:'2026-06-02',structure:75,bias:68,experience:80,effect:72,overall:74,status:'completed',
+    note:'角色扮演环节设计得很好，有效评估了销售实战能力。建议在面试前更清晰地向候选人说明评估维度。',
+    strengths:['角色扮演设计出色','实战能力评估准确'],
+    improvements:['面试前说明评估维度','减少主观印象分','增加情境判断测试']},
+  {id:10,interviewerId:7,candidate:'应聘者J',position:'HRBP',date:'2026-05-28',structure:70,bias:72,experience:75,effect:68,overall:71,status:'completed',
+    note:'整体表现尚可。偶尔在追问环节表现出个人偏好——对某些背景的候选人追问更深。建议注意提问的一致性。',
+    strengths:['面试节奏控制好','善于建立信任感'],
+    improvements:['保持提问一致性','避免对不同候选人追问深度差异过大','使用标准化评分表']},
+];
+
+// Practice scenarios
+const scenarios = [
+  {id:'s1',icon:'💻',title:'技术面·初级前端',desc:'评估应届生的前端基础和潜力',role:'技术'},
+  {id:'s2',icon:'📋',title:'产品面·社招PM',desc:'评估3年经验产品经理的产品思维',role:'产品'},
+  {id:'s3',icon:'🎨',title:'设计面·UI设计师',desc:'评估设计师的作品集和设计思路',role:'设计'},
+  {id:'s4',icon:'🤝',title:'行为面·跨部门协作',desc:'练习行为面试法，评估协作能力',role:'通用'},
+  {id:'s5',icon:'⚠️',title:'高压面·冲突处理',desc:'练习在压力场景下保持专业',role:'通用'},
+  {id:'s6',icon:'🌟',title:'高管面·总监级',desc:'练习评估高层候选人的战略思维',role:'通用'},
+];
+
+// Best practices pool
+const bestPracticesPool = [
+  {title:'结构化面试提纲模板',desc:'包含开场白→技术评估→项目深挖→行为面试→文化匹配→候选人提问 六个环节的标准指引',tags:['模板','必读']},
+  {title:'面试官法律红线清单',desc:'年龄/婚育/地域/宗教/性取向等受保护特征均不得作为面试评估依据',tags:['合规','必读']},
+  {title:'行为面试法(STAR)实战指南',desc:'如何通过Situation-Task-Action-Result框架深入评估候选人的真实能力',tags:['方法论','推荐']},
+  {title:'候选人体验优化手册',desc:'从面试邀请→到场接待→面试过程→面试后跟进的全流程体验优化建议',tags:['体验','推荐']},
+  {title:'"像我效应"偏见识别',desc:'面试官倾向于对与自己相似的候选人评分更高——如何识别并克服这种认知偏差',tags:['偏见','重要']},
+  {title:'技术面试评分标准',desc:'从基础扎实度/问题解决/代码质量/系统设计/沟通协作五个维度标准化评分',tags:['标准','技术']},
+  {title:'群面评估框架',desc:'无领导小组讨论中如何评估领导力/协作/逻辑/表达/抗压能力',tags:['方法论','推荐']},
+  {title:'远程面试注意事项',desc:'网络/环境/设备/眼神交流/屏幕共享等技术细节和体验要点',tags:['实操','推荐']},
+];
+
+// ==================== STATE ====================
+let currentRole = 'interviewer';
+let currentInterviewerId = 1;
+
+// ==================== CLOCK ====================
+(function u(){document.getElementById('clock').textContent=new Date().toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});setTimeout(u,60000)})();
+
+// ==================== ROLE SWITCH ====================
+function switchRole(role){
+  currentRole=role;
+  document.querySelectorAll('.role-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('show'));
+  if(role==='interviewer'){document.querySelectorAll('.role-tab')[0].classList.add('active');document.getElementById('view-interviewer').classList.add('show')}
+  else{document.querySelectorAll('.role-tab')[1].classList.add('active');document.getElementById('view-hr').classList.add('show')}
+  updateIdentitySelect(); renderAll();
+}
+
+function switchIdentity(val){
+  if(currentRole==='interviewer') currentInterviewerId=parseInt(val);
+  renderAll();
+}
+
+function updateIdentitySelect(){
+  const sel=document.getElementById('identitySelect');
+  const hint=document.getElementById('identityHint');
+  if(currentRole==='interviewer'){
+    sel.innerHTML=interviewers.map(i=>`<option value="${i.id}" ${i.id===currentInterviewerId?'selected':''}>🎙️ ${i.name}</option>`).join('');
+    hint.textContent='— 选择查看哪位面试官';
+  }else{
+    sel.innerHTML='<option>HR 全局视角</option>';
+    hint.textContent='';
+  }
+}
+
+function renderAll(){
+  renderStats();
+  if(currentRole==='interviewer'){renderInterviewerView();renderPracticeMode();renderGrowthTrend()}
+  else{renderHRView();renderBestPractices()}
+}
+
+// ==================== STATS ====================
+function renderStats(){
+  if(currentRole==='interviewer'){
+    const myIv=interviews.filter(i=>i.interviewerId===currentInterviewerId);
+    const avg=myIv.length?Math.round(myIv.reduce((s,i)=>s+i.overall,0)/myIv.length):0;
+    const best=myIv.length?Math.max(...myIv.map(i=>i.overall)):0;
+    const needsImprove=myIv.filter(i=>i.overall<70).length;
+    const interviewer=interviewers.find(i=>i.id===currentInterviewerId);
+    document.getElementById('statsRow').innerHTML=[
+      {icon:'📊',value:avg+'',label:'AI综合评分',sub:myIv.length+'场面试',cls:'c1'},
+      {icon:'🏆',value:best+'',label:'最佳表现',sub:'最高单场评分',cls:'c2'},
+      {icon:'📈',value:interviewer?.total+'',label:'累计面试',sub:'趋势 '+interviewer?.trend,cls:'c3'},
+      {icon:'🎯',value:needsImprove+'',label:'需改进场次',sub:needsImprove?'需重点关注':'全部及格',cls:needsImprove?'c4':''},
+    ].filter(s=>s.cls).map(s=>`<div class="stat-card ${s.cls}"><div class="stat-glow"></div><div class="stat-icon">${s.icon}</div><div class="stat-value">${s.value}</div><div class="stat-label">${s.label}</div><div class="stat-sub">${s.sub}</div></div>`).join('');
+  }else{
+    const allAvg=Math.round(interviewers.reduce((s,i)=>{const iv=interviews.filter(x=>x.interviewerId===i.id);return s+(iv.length?Math.round(iv.reduce((a,b)=>a+b.overall,0)/iv.length):0)},0)/interviewers.length);
+    const redList=interviewers.filter(i=>{const iv=interviews.filter(x=>x.interviewerId===i.id);const avg=iv.length?Math.round(iv.reduce((a,b)=>a+b.overall,0)/iv.length):0;return avg<70;}).length;
+    document.getElementById('statsRow').innerHTML=[
+      {icon:'👥',value:interviewers.length+'',label:'面试官总数',sub:'覆盖技术/产品/设计/销售/HR',cls:'c1'},
+      {icon:'📊',value:allAvg+'',label:'团队均分',sub:interviews.length+'场面试数据',cls:'c2'},
+      {icon:'🎙️',value:interviews.length+'',label:'累计面试记录',sub:'AI分析覆盖100%',cls:'c3'},
+      {icon:'⚠️',value:redList+'',label:'需培训面试官',sub:redList?'需安排辅导':'全员达标',cls:redList?'c4':''},
+    ].filter(s=>s.cls).map(s=>`<div class="stat-card ${s.cls}"><div class="stat-glow"></div><div class="stat-icon">${s.icon}</div><div class="stat-value">${s.value}</div><div class="stat-label">${s.label}</div><div class="stat-sub">${s.sub}</div></div>`).join('');
+  }
+}
+
+// ==================== INTERVIEWER VIEW ====================
+function renderInterviewerView(){
+  const myIv=interviews.filter(i=>i.interviewerId===currentInterviewerId).sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('myInterviews').innerHTML=myIv.map(iv=>{
+    const ringColor=iv.overall>=80?'var(--green)':iv.overall>=65?'var(--gold)':'var(--red)';
+    const r=24; const circ=2*Math.PI*r; const offset=circ-(iv.overall/100)*circ;
+    return`
+    <div class="interview-item">
+      <div class="iv-score">
+        <div class="score-ring sm"><svg width="60" height="60" viewBox="0 0 56 56"><circle cx="28" cy="28" r="${r}" fill="none" stroke="var(--border)" stroke-width="4"/><circle cx="28" cy="28" r="${r}" fill="none" stroke="${ringColor}" stroke-width="4" stroke-dasharray="${circ}" stroke-dashoffset="${offset}" stroke-linecap="round"/></svg><span class="ring-val" style="font-size:15px">${iv.overall}</span></div>
+      </div>
+      <div class="iv-info">
+        <div class="iv-header">
+          <span class="iv-title">${iv.candidate} · ${iv.position}</span>
+          <span class="badge ${iv.overall>=80?'badge-good':iv.overall>=65?'badge-ok':'badge-bad'}">${iv.overall>=80?'优秀':iv.overall>=65?'良好':'需改进'}</span>
+        </div>
+        <div class="iv-meta"><span>📅 ${iv.date}</span><span>🎙️ ${interviewers.find(x=>x.id===iv.interviewerId)?.name.split('（')[0]}</span></div>
+        <div class="iv-dimensions">
+          <div class="dimension-bar"><span class="dim-label">结构化</span><div class="dim-track"><div class="dim-fill ${iv.structure>=80?'good':iv.structure>=60?'ok':'bad'}" style="width:${iv.structure}%"></div></div><span>${iv.structure}</span></div>
+          <div class="dimension-bar"><span class="dim-label">偏见控制</span><div class="dim-track"><div class="dim-fill ${iv.bias>=80?'good':iv.bias>=60?'ok':'bad'}" style="width:${iv.bias}%"></div></div><span>${iv.bias}</span></div>
+          <div class="dimension-bar"><span class="dim-label">候选人体验</span><div class="dim-track"><div class="dim-fill ${iv.experience>=80?'good':iv.experience>=60?'ok':'bad'}" style="width:${iv.experience}%"></div></div><span>${iv.experience}</span></div>
+          <div class="dimension-bar"><span class="dim-label">问题有效性</span><div class="dim-track"><div class="dim-fill ${iv.effect>=80?'good':iv.effect>=60?'ok':'bad'}" style="width:${iv.effect}%"></div></div><span>${iv.effect}</span></div>
+        </div>
+        <div class="ai-feedback">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="color:var(--cyan)">🤖</span><strong style="font-size:12px">AI 分析</strong></div>
+          <p style="margin-bottom:4px">${iv.note}</p>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:6px">
+            <span style="color:var(--green)">✅ ${iv.strengths.slice(0,2).join(' / ')}</span>
+            <span style="color:var(--gold)">💡 ${iv.improvements.slice(0,2).join(' / ')}</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ==================== PRACTICE MODE ====================
+function renderPracticeMode(){
+  document.getElementById('scenarioGrid').innerHTML=scenarios.map(s=>`
+    <button class="scenario-btn" onclick="startPractice('${s.id}')">
+      <span class="sc-icon">${s.icon}</span><strong>${s.title}</strong><br><span style="font-size:10px;color:var(--text2)">${s.desc}</span>
+    </button>
+  `).join('');
+}
+
+function startPractice(sid){
+  const scenario=scenarios.find(s=>s.id===sid);
+  const feedbacks={
+    s1:['准备阶段：你选择了合适的技术题目难度梯度 ⭐','提问阶段：你给了候选人充足的思考时间 👍','评估阶段：建议使用标准化评分表代替主观印象','改进点：可以在最后让候选人展示自己的项目代码'],
+    s2:['你有效地用"产品上线后数据如何"来深挖经验 ✅','追问环节表现出色，问题之间逻辑连贯','建议：增加对失败经历的追问——"你主导的产品有没有失败的？为什么？"'],
+    s3:['作品集评审结构清晰：整体→细节→设计决策→复盘 ✅','你注意到候选人设计中的可访问性问题，专业！','改进：多问"为什么这样设计"而非"这是什么"'],
+    s4:['STAR法则运用得当，每个行为问题都有完整追问 ✅','需要注意：在候选人回答后不要急于给建议，先追问','你建立了良好的对话氛围，候选人愿意分享 👍'],
+    s5:['在冲突模拟中保持了冷静和专业 ✅','建议：使用"我理解你的感受，但是..."的句式','关键收获：学会了区分"立场"和"利益"'],
+    s6:['战略思维评估维度全面：行业视野/组织设计/文化塑造 ✅','追问了候选人"如何处理董事会分歧"，问题质量高','建议：更多关注候选人的"思考过程"而非"正确答案"'],
+  };
+  const fb=feedbacks[sid]||feedbacks.s1;
+  const score=60+Math.floor(Math.random()*30);
+  document.getElementById('practiceResult').innerHTML=`
+    <div style="background:var(--card3);border-radius:12px;padding:16px;margin-top:12px;text-align:left;animation:fadeSlide 0.5s ease">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <div class="score-ring sm"><svg width="60" height="60" viewBox="0 0 56 56"><circle cx="28" cy="28" r="24" fill="none" stroke="var(--border)" stroke-width="4"/><circle cx="28" cy="28" r="24" fill="none" stroke="${score>=80?'var(--green)':'var(--gold)'}" stroke-width="4" stroke-dasharray="${2*Math.PI*24}" stroke-dashoffset="${2*Math.PI*24*(1-score/100)}" stroke-linecap="round"/></svg><span class="ring-val">${score}</span></div>
+        <div><strong>${scenario?.title}</strong><br><span style="font-size:11px;color:var(--text2)">AI即时评估</span></div>
+      </div>
+      ${fb.map(f=>`<div class="fb-item">${f}</div>`).join('')}
+      <button class="btn btn-cyan btn-sm" style="margin-top:10px" onclick="renderPracticeMode();document.getElementById('practiceResult').innerHTML=''">🔄 再来一次</button>
+    </div>
+  `;
+}
+
+// ==================== GROWTH TREND ====================
+function renderGrowthTrend(){
+  const myIv=interviews.filter(i=>i.interviewerId===currentInterviewerId).sort((a,b)=>a.date.localeCompare(b.date));
+  if(myIv.length<2){document.getElementById('growthTrend').innerHTML='<p style="color:var(--text2);font-size:13px">至少需要2场面试才能生成趋势分析</p>';return;}
+  const first=myIv[0].overall,last=myIv[myIv.length-1].overall,change=last-first;
+  const trendIcon=change>5?'🚀':change>0?'📈':change==0?'➡️':'📉';
+  const trendColor=change>0?'var(--green)':change<0?'var(--red)':'var(--text2)';
+  document.getElementById('growthTrend').innerHTML=`
+    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+      <div style="text-align:center;padding:16px;background:var(--card2);border-radius:12px;flex:1;min-width:100px">
+        <div style="font-size:28px">${trendIcon}</div>
+        <div style="font-size:20px;font-weight:800;color:${trendColor}">${change>0?'+':''}${change}</div>
+        <div style="font-size:11px;color:var(--text2)">评分变化 (${myIv[0].date}→${myIv[myIv.length-1].date})</div>
+      </div>
+      <div style="flex:2;min-width:200px">
+        ${myIv.map((iv,i)=>`
+          <div style="display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px">
+            <span style="color:var(--text2);min-width:70px">${iv.date}</span>
+            <div style="flex:1;height:16px;background:var(--border);border-radius:8px;overflow:hidden">
+              <div style="height:100%;width:${iv.overall}%;background:linear-gradient(90deg,var(--cyan),var(--purple));border-radius:8px;transition:width 0.8s ease"></div>
+            </div>
+            <span style="font-weight:700;min-width:28px">${iv.overall}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ==================== HR VIEW ====================
+function renderHRView(){
+  document.getElementById('qualityTable').innerHTML=interviewers.map(iv=>{
+    const ivs=interviews.filter(i=>i.interviewerId===iv.id);
+    const avg=(arr)=>{const v=ivs.map(i=>i[arr]);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):0};
+    const avgO=ivs.length?Math.round(ivs.reduce((a,b)=>a+b.overall,0)/ivs.length):0;
+    const cl=avgO>=80?'badge-good':avgO>=65?'badge-ok':'badge-bad';
+    return`<tr onclick="showInterviewerDetail(${iv.id})">
+      <td><strong>${iv.name.split('（')[0]}</strong><br><span style="font-size:10px;color:var(--text2)">${iv.role}</span></td>
+      <td>${iv.total}</td>
+      <td>${avg('structure')}</td><td>${avg('bias')}</td><td>${avg('experience')}</td><td>${avg('effect')}</td>
+      <td><span class="badge ${cl}">${avgO}</span></td>
+      <td>${iv.trend}</td>
+      <td><button class="btn btn-cyan btn-sm" onclick="event.stopPropagation();switchToInterviewer(${iv.id})">🔍 查看</button></td>
+    </tr>`;
+  }).join('');
+
+  // Alerts
+  const risky=interviewers.filter(i=>{const iv=interviews.filter(x=>x.interviewerId===i.id);return iv.some(x=>x.bias<55||x.structure<55)});
+  document.getElementById('hrAlerts').innerHTML=risky.length===0?'<p style="color:var(--green)">✅ 所有面试官表现正常</p>':
+    risky.map(i=>{const iv=interviews.filter(x=>x.interviewerId===i.id);return`<div style="padding:10px;margin:6px 0;background:rgba(239,68,68,0.06);border-radius:8px;border-left:3px solid var(--red);font-size:13px">🔴 <strong>${i.name.split('（')[0]}</strong>：${iv.filter(x=>x.bias<55).length}场偏见风险 / ${iv.filter(x=>x.structure<55).length}场结构化不足 — <span style="color:var(--red)">建议安排面试官认证培训</span></div>`}).join('');
+}
+
+function showInterviewerDetail(id){
+  const iv=interviewers.find(i=>i.id===id);
+  const ivs=interviews.filter(i=>i.interviewerId===id);
+  showToast(`🎙️ ${iv?.name.split('（')[0]}：${ivs.length}场面试，综合均分${ivs.length?Math.round(ivs.reduce((a,b)=>a+b.overall,0)/ivs.length):'—'}`,'info');
+}
+
+function switchToInterviewer(id){
+  currentRole='interviewer';currentInterviewerId=id;
+  document.querySelectorAll('.role-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('show'));
+  document.querySelectorAll('.role-tab')[0].classList.add('active');
+  document.getElementById('view-interviewer').classList.add('show');
+  updateIdentitySelect();renderAll();
+}
+
+// ==================== BEST PRACTICES ====================
+function renderBestPractices(){
+  const items=shuffle([...bestPracticesPool]).slice(0,5);
+  document.getElementById('bestPractices').innerHTML=items.map(b=>`
+    <div style="background:var(--card2);border-radius:10px;padding:14px;margin-bottom:8px;border-left:3px solid var(--cyan)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong style="font-size:14px">${b.title}</strong>
+        <span style="display:flex;gap:4px">${b.tags.map(t=>`<span class="badge ${t==='必读'?'badge-bad':t==='重要'?'badge-ok':'badge-good'}">${t}</span>`).join('')}</span>
+      </div>
+      <p style="font-size:12px;color:var(--text2);margin-top:4px">${b.desc}</p>
+    </div>
+  `).join('');
+}
+
+// ==================== HELPERS ====================
+function shuffle(arr){let m=arr.length,t,i;while(m){i=Math.floor(Math.random()*m--);t=arr[m];arr[m]=arr[i];arr[i]=t}return arr}
+function showToast(msg,type){
+  const t=document.createElement('div');t.className='toast '+(type||'success');t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>{t.style.animation='slideIn 0.3s ease reverse';setTimeout(()=>t.remove(),300)},2500);
+}
+
+// INIT
+updateIdentitySelect();renderAll();
+</script>
+</body>
+</html>
